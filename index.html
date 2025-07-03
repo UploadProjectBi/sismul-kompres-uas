@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Kompresi Gambar, Audio & Video</title>
+  <script src="https://cdn.jsdelivr.net/npm/browser-image-compression@latest/dist/browser-image-compression.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      background: #f0f0f0;
+    }
+    .container {
+      background: white;
+      border-radius: 1rem;
+      padding: 2rem;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      max-width: 600px;
+      margin: auto;
+    }
+    input, button, label, select {
+      display: block;
+      margin: 1rem 0;
+      width: 100%;
+    }
+    .preview {
+      max-width: 100%;
+      margin-top: 1rem;
+    }
+    .file-size {
+      font-size: 0.9rem;
+      color: #555;
+    }
+    progress {
+      width: 100%;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>UAS Sistem Multimedia</h1>
+    <h3>M Hasbi Hasbullah (1217050076)</h3>
+    <h1>🧰 Kompresi Gambar, Audio & Video</h1>
+
+    <!-- Gambar -->
+    <h3>🖼️ Kompresi Gambar</h3>
+    <input type="file" id="imageInput" onchange="previewImage(event)">
+    <label for="imageQuality">Kualitas (%): <span id="imageQualityValue">90</span>%</label>
+    <input type="range" id="imageQuality" min="10" max="100" value="90" oninput="document.getElementById('imageQualityValue').innerText=this.value">
+    <p class="file-size" id="imageSize"></p>
+    <button onclick="compressImage()">Kompres Gambar</button>
+    <progress id="imageProgress" value="0" max="100" style="display:none"></progress>
+    <img id="imagePreview" class="preview" alt="Preview Gambar">
+
+    <!-- Audio/Video -->
+    <h3>🎥 & 🎵 Kompresi Video/Audio</h3>
+    <input type="file" id="mediaInput">
+    <select id="mediaType">
+      <option value="video">Video</option>
+      <option value="audio">Audio</option>
+    </select>
+    <label for="mediaQuality">Kualitas: <span id="mediaQualityValue">28</span></label>
+    <input type="range" id="mediaQuality" min="10" max="50" value="28" oninput="document.getElementById('mediaQualityValue').innerText=this.value">
+    <button onclick="compressMediaServer()">Kompres di Server</button>
+
+    <p id="status"></p>
+  </div>
+
+  <script>
+    function formatSize(size) {
+      return (size / 1024 / 1024).toFixed(2) + ' MB';
+    }
+
+    async function compressImage() {
+      const imageFile = document.getElementById('imageInput').files[0];
+      if (!imageFile) return;
+      const quality = parseInt(document.getElementById('imageQuality').value);
+      const progress = document.getElementById('imageProgress');
+      progress.style.display = 'block';
+      progress.value = 0;
+      const options = {
+        maxSizeMB: 5,
+        initialQuality: quality / 100,
+        useWebWorker: true,
+        onProgress: p => progress.value = p
+      };
+      const beforeSize = formatSize(imageFile.size);
+      try {
+        const compressedFile = await imageCompression(imageFile, options);
+        const url = URL.createObjectURL(compressedFile);
+        downloadFile(url, 'compressed_image.jpg');
+        document.getElementById('status').innerText = `✅ Gambar dikompresi: ${beforeSize} → ${formatSize(compressedFile.size)}`;
+      } catch (error) {
+        alert('Gagal kompres gambar: ' + error);
+      } finally {
+        progress.style.display = 'none';
+      }
+    }
+
+    function downloadFile(url, filename) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function previewImage(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      document.getElementById('imageSize').innerText = `Ukuran asli: ${formatSize(file.size)}`;
+      const reader = new FileReader();
+      reader.onload = e => document.getElementById('imagePreview').src = e.target.result;
+      reader.readAsDataURL(file);
+    }
+
+    async function compressMediaServer() {
+      const file = document.getElementById('mediaInput').files[0];
+      if (!file) return;
+
+      const type = document.getElementById('mediaType').value;
+      const quality = document.getElementById('mediaQuality').value;
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', type);
+      formData.append('quality', quality);
+
+      document.getElementById('status').innerText = '⏳ Mengunggah dan memproses...';
+
+      try {
+        const response = await fetch('https://backend-compress-master-f986567.kuberns.cloud', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!response.ok) throw new Error('Gagal dari server');
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const filename = file.name.replace(/\.[^/.]+$/, "") + "_compressed." + (type === 'video' ? 'mp4' : 'mp3');
+        downloadFile(url, filename);
+        document.getElementById('status').innerText = '✅ Berhasil dikompresi dan terunduh.';
+      } catch (err) {
+        document.getElementById('status').innerText = '❌ Gagal: ' + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
